@@ -1,0 +1,25 @@
+BEFORE EDITING THE CODE
+------------------------
+
+1. It would be difficult to write this program using mulitple processes instead of threads because with this application because multiple processes will not share the same memory space and this could leave to problems, such as deadlock. Threads share the same memory space making sharing data between the different threads easier.
+
+2. 'workperformed' is used as a flag to check if the thread is in the middle of swapping characters. It would stop the threads from executing if there is a swap occurring.
+
+3. 'fp' is a pointer to a function that takes a single parameter which is of type void * and returns a pointer of type void *.
+
+QUESTIONS
+----------
+
+1. We do not detach any of the enzyme threads because if we use the detach function, it means that the thread of execution is separated from the thread object so if the thread was to be terminated/destroyed the thread of execution would continue on and we would not know when the thread of execution has been completed. The program will still function if we detach the sleeper thread, it may not be optimal because there would not be time for the processor to be available for other threads of the program. 
+
+2. The program uses sched_yield to move the current thread to the end of the queue and allow a new thread with the same priority to run. If this was not used, the program would still function normally and the swap counts will not be identical and would increment normally.  
+
+3. The total number of swaps are only from the threads that have run to full completion. Therefore, we do not include the cancelled threads when adding the total number of swaps because they are threads that did not run until completion.
+
+4. When a thread tries to join on itself does result in a deadlock and will return error code EDEADLK. According to the documentation for 'pthread_join' EDEADLK will be returned if there was a deadlock detected or if the thread calling the function is the same as the one passed into the function.
+
+5. The sleeper thread is implemented by having the sleeper function be one of the arguments for 'pthread_create'. According to the documentation for 'pthread_create', the new thread will start by execution the routine passed into the argument (sleeper_func) and the sole argument which specifies the amount of time (5).
+
+6. PTHREAD_CANCEL_ASYNCHRONOUS is used so that the thread can be cancelled at any time.
+
+7. The error was that new memory was not being allocated for each thread, but only once. 
