@@ -11,7 +11,9 @@ pthread_t sentinelThread;
 char buffer[BUF_SIZE];
 int num_ops;
 
-/* Utiltity functions provided for your convenience */
+pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+
+/* Utility functions provided for your convenience */
 
 /* int2string converts an integer into a string and writes it in the
    passed char array s, which should be of reasonable size (e.g., 20
@@ -39,7 +41,7 @@ int isNumeric(char c)
 
 void printErrorAndExit(char *msg)
 {
-    msg = msg ? msg : "An unspecified error occured!";
+    msg = msg ? msg : "An unspecified error occurred!";
     fprintf(stderr, "%s\n", msg);
     exit(EXIT_FAILURE);
 }
@@ -73,6 +75,9 @@ void *adder(void *arg)
 	}
 
 	/* storing this prevents having to recalculate it in the loop */
+
+	pthread_mutex_lock(&lock);
+
 	bufferlen = strlen(buffer);
 	result = (char*)malloc((bufferlen+1) * sizeof(char));
 
@@ -85,7 +90,7 @@ void *adder(void *arg)
 				// checks to see if the number is followed by +
 				if (buffer[i+1] == '+') {
 					operator = i+1; // storing the position of the operator '+'
-					value1 = string2int(&buffer[i]); // change the charcter into an int so it can be stored in value1
+					value1 = string2int(&buffer[i]); // change the character into an int so it can be stored in value1
 					startOffset = i; // update the value for the position of value1
 				}
 			}
@@ -106,21 +111,23 @@ void *adder(void *arg)
 			int2string(sum, result); // converting the sum into a string
 
 			int resultLength = strlen(result);
-
 			int difference = bufferlen-resultLength;
 
+			// adding the sum into the buffer
 			strncpy(&buffer[startOffset], result, resultLength);
-			memmove(&buffer[resultLength], &buffer[remainderOffset+1], difference);
-
+			// shifting the buffer to the left
+			memmove(&buffer[resultLength], &buffer[remainderOffset+1], difference * sizeof(int));
 		}
 	}
 	// something missing?
+	int unlockRet = pthread_mutex_unlock(&lock);
+	// printf("Add unlock: %d\n", unlockRet);
     }
 }
 
 /* Looks for a multiplication symbol "*" surrounded by two numbers, e.g.
    "5*6" and, if found, multiplies the two numbers and replaces the
-   mulitplication subexpression with the result ("1+(5*6)+8" becomes
+   multiplication subexpression with the result ("1+(5*6)+8" becomes
    "1+(30)+8"). */
 void *multiplier(void *arg)
 {
@@ -140,6 +147,8 @@ void *multiplier(void *arg)
 	    return NULL;
 	}
 
+	pthread_mutex_lock(&lock);
+
 	/* storing this prevents having to recalculate it in the loop */
 	bufferlen = strlen(buffer);
 	result = (char*)malloc((bufferlen+1) * sizeof(char));
@@ -153,7 +162,7 @@ void *multiplier(void *arg)
 				// checks to see if the number is followed by +
 				if (buffer[i+1] == '*') {
 					operator = i+1; // storing the position of the operator '*'
-					value1 = string2int(&buffer[i]); // change the charcter into an int so it can be stored in value1
+					value1 = string2int(&buffer[i]); // change the character into an int so it can be stored in value1
 					startOffset = i; // update the value for the position of value1
 				}
 			}
@@ -177,12 +186,17 @@ void *multiplier(void *arg)
 
 			int difference = bufferlen-resultLength;
 
+			// adding the sum into the buffer
 			strncpy(&buffer[startOffset], result, resultLength);
-			memmove(&buffer[resultLength], &buffer[remainderOffset+1], difference);
+			// shifting the buffer to the left
+			memmove(&buffer[resultLength], &buffer[remainderOffset+1], difference * sizeof(int));
 
+			
 		}
 	}
 	// something missing?
+	int unlockRet = pthread_mutex_unlock(&lock);
+	// printf("multiply unlock: %d\n", unlockRet);
     }
 }
 
@@ -195,7 +209,7 @@ void *degrouper(void *arg)
     int bufferlen;
     int i;
 
-    return NULL; /* remove this line */
+    // return NULL; /* remove this line */
 
     while (1) {
 
@@ -203,18 +217,37 @@ void *degrouper(void *arg)
 	    return NULL;
 	}
 
+	pthread_mutex_lock(&lock);
+
 	/* storing this prevents having to recalculate it in the loop */
 	bufferlen = strlen(buffer);
 
 	for (i = 0; i < bufferlen; i++) {
-	    // check for '(' followed by a naked number followed by ')'
-		
+	    // check for '('
+		if (buffer[i] == '(') {
 
-	    
-	    // remove ')' by shifting the tail end of the expression
-	    // remove '(' by shifting the beginning of the expression
+			// check that it is followed by a naked number
+			if (isNumeric(buffer[i+1])) {
+
+				// check that the naked number if followed by ')'
+				for (int j = i+1; j < bufferlen; j++) {
+					if (buffer[j] == ')') {
+
+						// remove ')' by shifting the tail end of the expression
+						memmove(&buffer[j], &buffer[j+1], (bufferlen-j) * sizeof(int));
+
+						// remove '(' by shifting the beginning of the expression
+						memmove(&buffer[i], &buffer[i+1], (bufferlen-i) * sizeof(int));
+					}
+				}
+			}
+		}
 	}
 	// something missing?
+
+	int unlockRet = pthread_mutex_unlock(&lock);
+	// printf("degrouper unlock: %d\n", unlockRet);
+
     }
 }
 
@@ -235,6 +268,7 @@ void *sentinel(void *arg)
 	    return NULL;
 	}
 
+	// pthread_mutex_lock(&lock);
 	/* storing this prevents having to recalculate it in the loop */
 	bufferlen = strlen(buffer);
 
@@ -259,6 +293,7 @@ void *sentinel(void *arg)
 	}
 
 	// something missing?
+	// pthread_mutex_unlock(&lock);
     }
 }
 
@@ -274,7 +309,7 @@ void *reader(void *arg)
 
 	fgets(tBuffer, sizeof(tBuffer), stdin);
 
-	/* Sychronization bugs in remainder of function need to be fixed */
+	/* Synchronization bugs in remainder of function need to be fixed */
 
 	newlen = strlen(tBuffer);
 	currentlen = strlen(buffer);
@@ -286,6 +321,7 @@ void *reader(void *arg)
 	    newlen--;
 	}
 
+	// pthread_mutex_lock(&lock);
 	/* -1 for null terminator, -1 for ; separator */
 	free = sizeof(buffer) - currentlen - 2;
 
@@ -296,6 +332,8 @@ void *reader(void *arg)
 	/* we can add another expression now */
 	strcat(buffer, tBuffer);
 	strcat(buffer, ";");
+
+	// pthread_mutex_unlock(&lock);
 
 	/* Stop when user enters '.' */
 	if (tBuffer[0] == '.') {
